@@ -1,0 +1,455 @@
+{
+  "info": {
+    "_postman_id": "a7e91f22-8b31-49d0-9123-7c5a1829e001",
+    "name": "PropTech Multi-Agent Real Estate Analyzer API",
+    "description": "אוסף Postman מלא למערכת מולטי-סוכנים לניתוח עסקאות והשקעות נדל\"ן (FastAPI + PostgreSQL + MongoDB RAG + HITL).\nכולל שמירה אוטומטית של jwt_token, property_id ו-run_id בין הבקשות.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "property_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "run_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Healthcheck",
+      "item": [
+        {
+          "name": "GET /health - בדיקת תקינות השרת",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Authentication (JWT)",
+      "item": [
+        {
+          "name": "1.1 POST /api/v1/auth/register - רישום משקיע חדש",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"investor@proptech.co.il\",\n  \"full_name\": \"דניאל כהן - משקיע נדלן\",\n  \"password\": \"StrongPassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "1.2 POST /api/v1/auth/login - התחברות ושמירת JWT אוטומטית",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('jwt_token', jsonData.access_token);",
+                  "    console.log('JWT Token saved automatically to collection variable jwt_token');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"investor@proptech.co.il\",\n  \"password\": \"StrongPassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Investor Memory Profile (Long-Term Memory)",
+      "item": [
+        {
+          "name": "2.1 GET /api/v1/investor/profile - שליפת פרופיל משקיע מ-MongoDB",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/investor/profile",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "investor", "profile"]
+            }
+          }
+        },
+        {
+          "name": "2.2 PUT /api/v1/investor/profile - עדכון העדפות והון עצמי",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"available_equity_ils\": 1100000.0,\n  \"risk_tolerance\": \"MODERATE\",\n  \"max_risk_score_threshold\": 70,\n  \"min_target_net_yield_pct\": 3.2,\n  \"preferred_cities\": [\"חיפה\", \"רמת גן\", \"תל אביב\"],\n  \"is_single_home_buyer\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/investor/profile",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "investor", "profile"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Properties & Legal RAG Documents",
+      "item": [
+        {
+          "name": "3.1 POST /api/v1/properties - יצירת נכס לבדיקה (שומר property_id אוטומטית)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('property_id', jsonData.id);",
+                  "    console.log('Property ID saved automatically:', jsonData.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"address\": \"שדרות הנשיא 45\",\n  \"city\": \"חיפה\",\n  \"neighborhood\": \"מרכז הכרמל\",\n  \"asking_price_ils\": 1900000.0,\n  \"area_sqm\": 105.0,\n  \"rooms\": 4.0,\n  \"floor\": 3,\n  \"estimated_monthly_rent_ils\": 6800.0,\n  \"is_single_home\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/properties",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "properties"]
+            }
+          }
+        },
+        {
+          "name": "3.2 POST /api/v1/properties/:property_id/documents - העלאת קובץ PDF ל-RAG",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "sample_tabu_haifa.pdf",
+                  "description": "בחר קובץ PDF של נסח טאבו / חוזה מכר (למשל sample_tabu_haifa.pdf)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/properties/{{property_id}}/documents",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "properties", "{{property_id}}", "documents"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Multi-Agent Analysis & HITL Approval",
+      "item": [
+        {
+          "name": "4.1 POST /api/v1/analysis/run - הרצת צוות הסוכנים (שומר run_id אוטומטית)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 202) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('run_id', jsonData.run_id);",
+                  "    console.log('Run ID saved automatically:', jsonData.run_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"property_id\": \"{{property_id}}\",\n  \"equity_ils\": 1100000.0,\n  \"annual_interest_rate_pct\": 4.75,\n  \"loan_years\": 25,\n  \"annual_expenses_ils\": 6000.0,\n  \"appreciation_rate_pct\": 3.0\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/analysis/run",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "analysis", "run"]
+            }
+          }
+        },
+        {
+          "name": "4.2 POST /api/v1/analysis/:run_id/approve - אישור אנושי (HITL) ועדכון מחיר לאחר מו\"מ",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"approved\": true,\n  \"updated_asking_price_ils\": 1650000.0,\n  \"updated_equity_ils\": 1100000.0,\n  \"investor_notes\": \"המוכר המציא מכתב החרגה לבנק והוריד מחיר ב-250 אלף ש\\\"ח בגין פער השטח בטאבו.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/analysis/{{run_id}}/approve",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "analysis", "{{run_id}}", "approve"]
+            }
+          }
+        },
+        {
+          "name": "4.3 GET /api/v1/analysis/:run_id - שליפת דוח ההשקעה הסופי",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/analysis/{{run_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "analysis", "{{run_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. v2.0 Expansion Pack (Vision CAPEX, Stress-Test, Share Deal)",
+      "item": [
+        {
+          "name": "5.1 POST /api/v1/properties/:property_id/vision-upload - אומדן שיפוץ וראייה ממוחשבת (סוכן 6)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"condition_hint\": \"NEEDS_FULL_RENOVATION\",\n  \"has_dampness\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/properties/{{property_id}}/vision-upload",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "properties", "{{property_id}}", "vision-upload"]
+            }
+          }
+        },
+        {
+          "name": "5.2 POST /api/v1/analysis/:run_id/stress-test - סימולטור מונטה-קרלו וריבית (סוכן 8)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"interest_rate_pct\": 6.0,\n  \"vacancy_months_per_year\": 1.5,\n  \"monthly_rent_override_ils\": 6500.0\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/analysis/{{run_id}}/stress-test",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "analysis", "{{run_id}}", "stress-test"]
+            }
+          }
+        },
+        {
+          "name": "5.3 POST /api/v1/analysis/:run_id/share-deal - שיתוף דיל וטיוטת מו\"מ ל-WhatsApp / Telegram (סוכן 9)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"whatsapp\",\n  \"recipient\": \"+972501234567\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/analysis/{{run_id}}/share-deal",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "analysis", "{{run_id}}", "share-deal"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

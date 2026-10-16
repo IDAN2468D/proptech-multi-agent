@@ -1,0 +1,48 @@
+openapi_spec_version: "1.0.0"
+system: "PropTech Multi-Agent Real Estate Investment Analyzer"
+agents:
+  market_agent:
+    input_context:
+      - city
+      - address
+      - asking_price_ils
+      - area_sqm
+      - rooms
+    output_schema: "MarketAnalysisResult"
+    tools:
+      - fetch_comparable_transactions
+      - fetch_neighborhood_rent_index
+  financial_agent:
+    input_context:
+      - asking_price_ils
+      - equity_ils
+      - estimated_monthly_rent_ils
+      - is_single_home
+      - annual_interest_rate_pct
+      - loan_years
+    output_schema: "FinancialMetricsResult"
+    zero_math_hallucination: true
+    tools:
+      - calculate_israeli_purchase_tax
+      - calculate_mortgage_schedule
+      - compute_roi_metrics
+  legal_rag_agent:
+    input_context:
+      - user_id
+      - property_id
+    output_schema: "LegalDueDiligenceResult"
+    require_exact_citations: true
+    tools:
+      - retrieve_sanitized_property_chunks
+  critic_guardrail_agent:
+    input_context:
+      - property_input
+      - investor_profile
+      - market_result
+      - financial_result
+      - legal_result
+    output_schema: "CriticVerdict"
+    hitl_triggers:
+      - overall_risk_score >= 70
+      - has_blocking_liens_or_warnings == true
+      - net_monthly_cashflow_ils < 0

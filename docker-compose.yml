@@ -1,0 +1,78 @@
+name: proptech-multi-agent
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: proptech_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: proptech
+      POSTGRES_PASSWORD: proptech_pass
+      POSTGRES_DB: proptech_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U proptech -d proptech_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mongo:
+    image: mongo:7
+    container_name: proptech_mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: proptech_backend
+    restart: unless-stopped
+    env_file:
+      - .env.example
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://proptech:proptech_pass@postgres:5432/proptech_db"
+      MONGO_URI: "mongodb://mongo:27017"
+      MONGO_DB_NAME: "proptech_ai"
+      USE_IN_MEMORY_MONGO_FALLBACK: "false"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app
+      - ./tests:/app/tests
+      - ./mcp_servers:/app/mcp_servers
+      - ./specs:/app/specs
+      - ./pyproject.toml:/app/pyproject.toml
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: proptech_frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: "http://localhost:8000"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  mongo_data:
